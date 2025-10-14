@@ -6,7 +6,7 @@
 - practice making maps in R, specifically using tmap
 ### Repository Structure:
 ```
-EDS223-HW2
+eds223-HW2
 │   README.md
 │   HW2.qmd
 │   Rmd/Proj files    
