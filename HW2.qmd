@@ -1,26 +1,97 @@
 ---
-title: "HW2"
+title: "Homework Assignment #2: Exploring patterns of environmental justice:"
 format: html
-editor: visual
+editor: source
+editor_options: 
+  chunk_output_type: console
 ---
-
-## Quarto
-
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
-
+## Load necessary libraries and data
 ```{r}
-1 + 1
+library(sf)
+library(tmap)
+library(tidyverse)
+library(spData)
+
+ejscreen <- sf::st_read(here::here("data", "ejscreen","EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb")) 
+
+birds <- sf::st_read(here::here("data", "gbif-birds-LA","gbif-birds-LA.shp")) 
+
+ineq <- sf::st_read(here::here("data", "mapping-inequality", "mapping-inequality-los-angeles.json"))
 ```
 
-You can add options to executable code like this
-
+## Check data CRS
 ```{r}
-#| echo: false
-2 * 2
+st_crs(ejscreen)
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+st_crs(birds)
+```
+
+```{r}
+st_crs(ineq)
+```
+We can see that the ejscreen data is in EPSG:3857, the common projected coordinate system, whereas the other two are in EPSG:4326 which is the common geodetic coordinate system. We can transform the other files' crs to match the ejscreen crs.
+
+```{r}
+birds <- st_transform(birds, crs = st_crs(ejscreen))
+
+ineq <- st_transform(ineq, crs = st_crs(ejscreen))
+```
+
+```{r}
+# Check
+st_crs(ineq) == st_crs(birds)
+```
+
+```{r}
+st_crs(ejscreen) == st_crs(ineq)
+```
+## Part 1: Legacy of redlining in current environmental (in)justice
+
+1. Create map of historical redlining neighborhoods, including:
+- neighborhoods colored by HOLC grade
+- an appropriate base map
+- a clear title and legend
+
+```{r}
+# filter to a state you are interested in
+california <- ejscreen %>%
+  dplyr::filter(ST_ABBREV == "CA") 
+
+# filter to a county you are interested in
+la_county <- ejscreen %>%
+  dplyr::filter(CNTY_NAME %in% c("Los Angeles County"))
+
+tm_shape(la_county, bbox = ineq) +
+  tm_borders(lwd = 0.2) +
+tm_shape(california, bbox = ineq) +
+  tm_polygons(fill = "lightblue", alpha = 0.5) +
+tm_shape(ineq) +
+  tm_polygons(fill = "grade", title = "HOLC Grades") +
+tm_legend(title = "Home Owners' Load Corporation #(HOLC)\n Historical Redlining Neighborhoods")
+```
+2. Create a table summarizing:
+- the percentage of census block groups that fall within each HOLC grade
+- Also include the percent of census block groups that dont fall within a HOLC grade
+_ **Hint:** The HOLC data contains the grades and the EJScreen data contains the census blocks, so you will need to combine the data spatially before doing summary statistics. Once you combine and no longer need the geometries, you can use st_drop_geometry(). 
+
+```{r}
+block_grades <- st_join(ineq, la_county, join = st_intersects)
+
+block_grades_df <- st_drop_geometry(block_grades)
+
+
+write_csv(block_grades_df, "block_grades_df.csv")
+#sum(is.na(block_grades_df$grade))
+```
+
+```{r}
+grade_summary <- block_grades_df %>% 
+  group_by(grade) %>% 
+  summarize(total_blocks = n()) %>% 
+  mutate(percent = total_blocks / nrow(block_grades_df))
+         
+sum(grade_summary$percent)
+```
+
