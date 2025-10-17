@@ -3,7 +3,7 @@ title: "Homework Assignment #2: Exploring patterns of environmental justice:"
 format: html
 editor: source
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 ## Load necessary libraries and data
 ```{r}
@@ -80,10 +80,6 @@ _ **Hint:** The HOLC data contains the grades and the EJScreen data contains the
 block_grades <- st_join(ineq, la_county, join = st_intersects)
 
 block_grades_df <- st_drop_geometry(block_grades)
-
-
-write_csv(block_grades_df, "block_grades_df.csv")
-#sum(is.na(block_grades_df$grade))
 ```
 
 ```{r}
@@ -94,4 +90,45 @@ grade_summary <- block_grades_df %>%
          
 sum(grade_summary$percent)
 ```
+
+3. Create at least two visualizations summarizing current conditions (from the EJScreen data) within HOLC grades using the mean of the following variables (you may combine variables or create separate plots):
+- % low income
+- percentile for Particulate Matter 2.5
+- percentile for low life expectancy
+- Use ggplot for your visualizations! You will first need to calculate mean of each variable grouped by HOLC grade.
+```{r}
+# Save data summary containing the means of each value by HOLC Grade
+grade_summary_plot <- block_grades_df %>% 
+  group_by(grade) %>% 
+  summarize(total_blocks = n(),
+            percent = total_blocks / nrow(block_grades_df),
+            mean_lowincome = mean(LOWINCPCT * 100),
+            mean_part = mean(P_PM25),
+            mean_lifeexp = mean(P_LIFEEXPPCT, na.rm = TRUE))
+
+# Select only the data that has a HOLC grade
+grade_summary_plot_graded <- grade_summary_plot[-5,]
+```
+
+```{r}
+ggplot(grade_summary_plot_graded, aes(x = mean_lowincome, y = mean_part, color = grade)) +
+  geom_point(size = 3) +
+  labs(x =  "% Low Income", y = "Mean Percentile for\n Particulate Matter", color = "HOLC Grade")
+```
+
+```{r}
+ggplot(grade_summary_plot_graded, aes(x = mean_lowincome, y = mean_lifeexp, color = grade)) +
+  geom_point(size = 3) +
+  labs(x = "% Low Income", y = "Mean Percentile for\n Low Life Expectancy", color = "HOLC Grade")
+  
+```
+
+
+4. Write a brief paragraph reflecting on these results
+- Interpret the patterns you observe in your results
+- Discuss potential relationships between historical redlining grades and current environmental/socioeconomic conditions
+
+
+These visualizations reveal a clear connection between historical HOLC grades and current environmental and socioeconomic conditions in Los Angeles County. Neighborhoods with lower HOLC grades (C and D) consistently show higher percentages of low-income residents and worse environmental health indicators. Grade D neighborhoods, which were historically redlined, have the highest rates of low-income residents at approximately 40%, compared to only 15% in Grade A neighborhoods. Similar disparities exist for environmental health measures: Grade D neighborhoods face higher exposure to particulate matter (80th percentile) and lower life expectancy (54th percentile), while Grade A neighborhoods experience better conditions with PM2.5 at the 72nd percentile and low life expectancy at only the 24th percentile. These patterns demonstrate how discriminatory housing policies from nearly 90 years ago continue to shape present-day environmental injustices, with historically redlined communities still bearing disproportionate burdens of poverty, pollution, and reduced life expectancy.
+
 
