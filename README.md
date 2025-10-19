@@ -46,6 +46,7 @@ eds223-HW2/
 
 ## Author
 **Emily Miller**
+
 [Github](https://github.com/rellimylime)
 
 ## Course Information
@@ -58,4 +59,4 @@ This analysis was completed for EDS 223: Geospatial Analysis and Remote Sensing 
 - Ellis-Soto, D., Chapman, M., & Locke, D. H. (2023). Historical redlining is associated with increasing geographical disparities in bird biodiversity sampling in the United States. *Nature Human Behaviour*, 1-9.
 
 - United States Environmental Protection Agency. 2023. EJSCREEN 2023. Retrieved: October 6, 2025, from www.epa.gov/ejscreen
-> [EPA EJScreen Site](https://19january2021snapshot.epa.gov/ejscreen_.html)
+- - [EPA EJScreen Site](https://19january2021snapshot.epa.gov/ejscreen_.html)
