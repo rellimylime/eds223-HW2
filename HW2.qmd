@@ -1,6 +1,14 @@
 ---
 title: "Homework Assignment #2: Exploring patterns of environmental justice:"
-format: pdf
+author: "Emily Miller"
+date: "11/03/2025"
+format: 
+  pdf:
+    keep-tex: true
+    include-in-header:
+      text: |
+        \usepackage{fvextra}
+        \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 editor: source
 editor_options: 
   chunk_output_type: inline
@@ -22,30 +30,47 @@ library(spData)
 library(knitr)
 library(viridis)
 library(testthat)
+```
+
+```{r}
+#| include: false
+
+# Set knitr options for code wrapping
+knitr::opts_chunk$set(
+  tidy = TRUE,
+  tidy.opts = list(width.cutoff = 40)
+)
+```
+
+```{r}
+#| echo: true
+#| message: false
+#| results: 'hide'
 
 # Load necessary data
-ejscreen <- sf::st_read(here::here("data", "ejscreen","EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb")) 
+ejscreen <- sf::st_read(here::here("data", "ejscreen", "EJSCREEN_2023_BG_StatePct_with_AS_CNMI_GU_VI.gdb")) 
 
 birds <- sf::st_read(here::here("data", "gbif-birds-LA","gbif-birds-LA.shp")) 
 
-ineq <- sf::st_read(here::here("data", "mapping-inequality", "mapping-inequality-los-angeles.json"))
+ineq <- sf::st_read(here::here("data", "mapping-inequality", "mapping-inequality-los-angeles.json")) 
 ```
 
 ## Check data CRS
 
 ```{r}
 # Return ejscreen crs
-st_crs(ejscreen)
+st_crs(ejscreen)$epsg
+
 ```
 
 ```{r}
 # Return birds crs
-st_crs(birds)
+st_crs(birds)$epsg
 ```
 
 ```{r}
 # Return ineq crs
-st_crs(ineq)
+st_crs(ineq)$epsg
 ```
 
 We can see that the ejscreen data is in EPSG:3857, the common projected coordinate system, whereas the other two are in EPSG:4326 which is the common geodetic coordinate system. We can transform the other files' crs to match the ejscreen crs.
@@ -58,16 +83,11 @@ birds <- st_transform(birds, crs = st_crs(ejscreen))
 ineq <- st_transform(ineq, crs = st_crs(ejscreen))
 
 # Check that all CRS match
-if(!st_crs(ineq) == st_crs(birds)) {
-  stop("ERROR: CRS of ineq and birds do not match after transformation!")
-}
-
-if(!st_crs(ejscreen) == st_crs(ineq)) {
-  stop("ERROR: CRS of ejscreen and ineq do not match after transformation!")
-}
-
-# Success message
-message("All datasets have matching CRS: ", st_crs(ejscreen)$input)
+test_that("all datasets have matching CRS", {
+  expect_equal(st_crs(birds), st_crs(ejscreen))
+  expect_equal(st_crs(ineq), st_crs(ejscreen))
+  expect_equal(st_crs(birds)$epsg, 3857)
+})
 ```
 
 ## Part 1: Legacy of redlining in current environmental (in)justice
@@ -93,7 +113,7 @@ la_county <- ejscreen %>%
 tm_basemap("Esri.OceanBasemap") + # Ocean basemap
 tm_shape(california, bbox = ineq) + # Get census block grids
   tm_borders(col = "gray70",
-             lwd = 0.3) +
+             lwd = 0.1) +
 tm_shape(ineq) + # HOLC Graded areas
   tm_polygons(fill = "grade", 
               fill.scale = tm_scale_categorical(values = "viridis"),
@@ -102,7 +122,7 @@ tm_shape(ineq) + # HOLC Graded areas
               lwd = 0.2) +
 tm_scalebar(position = c("right", "bottom")) +
 tm_compass(position = c("right", "top")) +
-tm_title(text = "Home Owners' Loan Corporation (HOLC)\nHistorical Redlining Neighborhoods in Los Angeles County") 
+tm_title(text = "Home Owners' Loan Corporation (HOLC) \nHistorical Redlining Neighborhoods in Los Angeles County") 
 ```
 
 2.  Create a table summarizing:
@@ -111,11 +131,20 @@ tm_title(text = "Home Owners' Loan Corporation (HOLC)\nHistorical Redlining Neig
 -   Also include the percent of census block groups that dont fall within a HOLC grade \_ **Hint:** The HOLC data contains the grades and the EJScreen data contains the census blocks, so you will need to combine the data spatially before doing summary statistics. Once you combine and no longer need the geometries, you can use st_drop_geometry().
 
 ```{r}
-# Perform spatial join 
-block_grades <- st_join(la_county, ineq, join = st_intersects)
+#| warning: false
+
+# Perform spatial join such that each block group is counted once
+block_grades <- st_join(la_county, ineq, join = st_intersects, largest = TRUE)
 
 # Drop geometries after join
 block_grades_df <- st_drop_geometry(block_grades)
+
+# Check that the spatial join worked as expected
+test_that("Spatial join completed successfully", {
+  expect_equal(nrow(block_grades), nrow(la_county))
+  expect_true("grade" %in% colnames(block_grades))
+  expect_true(sum(!is.na(block_grades$grade)) > 0)
+})
 ```
 
 ```{r}
@@ -128,7 +157,9 @@ grade_summary <- block_grades_df %>%
 # Verify percentages sum to 100%
 total_percent <- sum(grade_summary$percent)
 if(abs(total_percent - 100) > 0.01) {
-  warning("WARNING: Percentages sum to ", round(total_percent, 2), "%, not 100%")
+  warning("WARNING: Percentages sum to ", 
+          round(total_percent, 2),
+          "%, not 100%")
 } else {
   message("Percentage sum to 100%")
 }
@@ -174,14 +205,15 @@ grade_summary_plot_graded <- grade_summary_plot %>%
 
 # Verify removal
 if(nrow(grade_summary_plot_graded) != 4) {
-  warning("Expected 4 HOLC grades (A, B, C, D), but found ", 
-          nrow(grade_summary_plot_graded))
+  warning("Expected 4 HOLC grades (A, B, C, D), but found ", nrow(grade_summary_plot_graded))
 }
 ```
 
 ```{r}
 # Plot Low Income vs PM2.5
-ggplot(grade_summary_plot_graded, aes(x = mean_lowincome, y = mean_part, color = grade)) +
+ggplot(grade_summary_plot_graded, aes(x = mean_lowincome, 
+                                      y = mean_part, 
+                                      color = grade)) +
   geom_point(size = 4, shape = 15) +
   scale_color_viridis_d(option = "viridis") +
   labs(
@@ -195,7 +227,9 @@ ggplot(grade_summary_plot_graded, aes(x = mean_lowincome, y = mean_part, color =
 
 ```{r}
 # Plot Low Income vs Life Expectancy
-ggplot(grade_summary_plot_graded, aes(x = mean_lowincome, y = mean_lifeexp, color = grade)) +
+ggplot(grade_summary_plot_graded, aes(x = mean_lowincome,
+                                      y = mean_lifeexp,
+                                      color = grade)) +
   geom_point(size = 4) +
   scale_color_viridis_d(option = "viridis") +
   labs(
@@ -287,9 +321,9 @@ portion_obs <- obs_per_grade %>%
 ```{r}
 # Create visualization to show percentage of bird observations within each HOLC grade
 ggplot(portion_obs, aes(x = grade, y= portion_obs, fill = grade)) +
-  geom_col(show.legend = FALSE) +
+  geom_col() +
     scale_fill_viridis_d(option = "viridis") +
-  labs(title = "Percentage of Bird Observations within HOLC Grades",
+  labs(title = "Percentage of Bird Observations within HOLC Grades in LA",
        x = "HOLC Grade",
        y = "Percentage of Observations (%)",
        fill = "HOLC Grade") +
